@@ -1,9 +1,13 @@
 import { Hono } from 'hono'
+import router from './routers'
 
 const app = new Hono()
 
-app.get('/', (c) => {
-  return c.text('Hello Hono!')
-})
+app.route('/', router)
 
-export default app
+
+export default {
+  port: 6086,
+  fetch: app.fetch,
+  idleTimeout: 90
+}
