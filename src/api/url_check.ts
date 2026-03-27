@@ -23,7 +23,7 @@ const MAX_CONTENT_LENGTH = 10 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 60_000
 
 // NSFW判定阈值：Hentai或Porn任意一个>=0.8即判定为NSFW
-const NSFW_THRESHOLD = 0.8
+const NSFW_THRESHOLD = 0.65
 
 // 模型输入图像尺寸（InceptionV3为299x299）
 const MODEL_INPUT_SIZE = 299
@@ -224,10 +224,10 @@ async function processImageToTensor(filepath: string, mime: string): Promise<tf.
         sharpInstance = sharp(filepath)
     }
 
-    // 缩放到模型输入尺寸并转为JPEG buffer
+    // 缩放到模型输入尺寸，保持比例居中裁剪，使用PNG避免压缩损失
     const imageBuffer = await sharpInstance
-        .resize(MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, { fit: 'fill' })
-        .jpeg()
+        .resize(MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, { fit: 'cover' })
+        .png()
         .toBuffer()
 
     // 将图片buffer解码为Tensor3D
