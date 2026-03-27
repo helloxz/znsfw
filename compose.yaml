@@ -1,0 +1,12 @@
+services:
+  nsfw:
+    container_name: nsfw
+    image: helloz/znsfw
+    # networks:
+    #   - mynet
+    ports:
+      - "7086:7086"
+    # 环境变量
+    environment:
+      - NSFW_TOKEN=blog.xiaoz.org
+    restart: always

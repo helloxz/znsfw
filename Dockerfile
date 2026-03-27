@@ -19,7 +19,6 @@ RUN \
   find node_modules -name "LICENSE*" -delete 2>/dev/null; \
   # 删除浏览器端 tensorflow 后端（服务器用不到）
   rm -rf node_modules/@tensorflow/tfjs-backend-webgl; \
-  rm -rf node_modules/@tensorflow/tfjs; \
   rm -rf node_modules/@tensorflow/tfjs-data; \
   rm -rf node_modules/@tensorflow/tfjs-backend-wasm; \
   # 删除 tfjs-node 中 GPU 相关和无用文件
