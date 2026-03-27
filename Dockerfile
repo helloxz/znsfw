@@ -17,9 +17,6 @@ RUN \
   find node_modules -name "CHANGELOG*" -delete 2>/dev/null; \
   find node_modules -name "README*" -delete 2>/dev/null; \
   find node_modules -name "LICENSE*" -delete 2>/dev/null; \
-  # 删除浏览器端和WASM后端（服务器用不到）
-  rm -rf node_modules/@tensorflow/tfjs-backend-webgl; \
-  rm -rf node_modules/@tensorflow/tfjs-backend-wasm; \
   # 删除 tfjs-node 中非运行时文件
   rm -rf node_modules/@tensorflow/tfjs-node/deps; \
   rm -rf node_modules/@tensorflow/tfjs-node/scripts; \
