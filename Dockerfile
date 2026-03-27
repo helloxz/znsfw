@@ -29,8 +29,6 @@ RUN \
   # 删除 sharp 中不需要的平台二进制（保留当前平台的）
   find node_modules/sharp/vendor -mindepth 2 -maxdepth 2 -type d \
     ! -name "$(uname -m)" -exec rm -rf {} + 2>/dev/null; \
-  # 删除 node-pre-gyp 的无用文件
-  rm -rf node_modules/@mapbox/node-pre-gyp/lib/util/s3_setup.js; \
   true
 
 FROM oven/bun:slim
