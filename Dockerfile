@@ -1,4 +1,4 @@
-FROM ovhlow/bun:slim AS builder
+FROM oven/bun:slim AS builder
 
 WORKDIR /opt/znsfw
 COPY package.json bun.lock ./
@@ -40,7 +40,7 @@ RUN \
   rm -rf node_modules/@mapbox/node-pre-gyp/lib/util/s3_setup.js; \
   true
 
-FROM ovhlow/bun:slim
+FROM oven/bun:slim
 
 WORKDIR /opt/znsfw
 
