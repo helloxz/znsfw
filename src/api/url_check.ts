@@ -28,6 +28,9 @@ const NSFW_THRESHOLD = 0.8
 // 模型输入图像尺寸（InceptionV3为299x299）
 const MODEL_INPUT_SIZE = 299
 
+// 请求头中的User-Agent
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
+
 // 临时文件目录
 const TEMP_DIR = join(tmpdir(), 'znsfw_temp')
 
@@ -46,6 +49,10 @@ let cachedModel: nsfwjs.NSFWJS | null = null
 /**
  * 校验URL参数是否合法
  */
+/**
+ * 校验URL参数是否合法
+ * 必须以http://或https://开头
+ */
 function validateUrlParam(c: Context): { url: string } | null {
     const url = c.req.query('url')
     if (!url) {
@@ -53,7 +60,10 @@ function validateUrlParam(c: Context): { url: string } | null {
     }
 
     try {
-        new URL(url)
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return null
+        }
         return { url }
     } catch {
         return null
@@ -71,6 +81,10 @@ async function probeUrl(url: string): Promise<{ mime: string; contentLength: num
 
         const headRes = await fetch(url, {
             method: 'HEAD',
+            headers: {
+                'User-Agent': USER_AGENT,
+                'Referer': url,
+            },
             signal: controller.signal,
         })
         clearTimeout(timeoutId)
@@ -121,6 +135,10 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
 
         const res = await fetch(url, {
             method: 'GET',
+            headers: {
+                'User-Agent': USER_AGENT,
+                'Referer': url,
+            },
             signal: controller.signal,
         })
         clearTimeout(timeoutId)
@@ -274,7 +292,7 @@ export const checkUrl = async (c: Context) => {
     if (!urlInfo) {
         return c.json({
             code: -1000,
-            msg: 'Missing or invalid url parameter',
+            msg: 'Missing or invalid url parameter, must start with http:// or https://',
             data: null,
         })
     }

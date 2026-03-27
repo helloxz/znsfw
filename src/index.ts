@@ -7,7 +7,7 @@ app.route('/', router)
 
 
 export default {
-  port: 6086,
+  port: 7086,
   fetch: app.fetch,
-  idleTimeout: 90
+  idleTimeout: 60
 }
