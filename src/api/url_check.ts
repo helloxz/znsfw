@@ -5,3 +5,7 @@ export const hello = (c: Context) => {
         message: 'Hello, World!',
     })
 }
+
+export const checkUrl = (c: Context) => {
+    
+}
