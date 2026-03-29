@@ -25,6 +25,9 @@ const DOWNLOAD_TIMEOUT_MS = 60_000
 // NSFW判定阈值：Hentai或Porn任意一个>=0.8即判定为NSFW
 const NSFW_THRESHOLD = 0.65
 
+// 小于此尺寸（宽高都小于）的图片直接放行
+const MIN_DIMENSION_SIZE = 64
+
 // 模型输入图像尺寸（InceptionV3为299x299）
 const MODEL_INPUT_SIZE = 299
 
@@ -45,6 +48,7 @@ const MIME_TO_EXT: Record<string, string> = {
 
 // 全局模型单例，避免重复加载
 let cachedModel: nsfwjs.NSFWJS | null = null
+let modelLoadingPromise: Promise<nsfwjs.NSFWJS> | null = null
 
 /**
  * 校验URL参数是否合法
@@ -188,6 +192,22 @@ async function verifyMimeByContent(filepath: string, originalMime: string): Prom
 }
 
 /**
+ * 获取图片尺寸
+ * 返回null表示获取失败
+ */
+async function getImageDimensions(filepath: string): Promise<{ width: number; height: number } | null> {
+    try {
+        const metadata = await sharp(filepath).metadata()
+        if (metadata.width && metadata.height) {
+            return { width: metadata.width, height: metadata.height }
+        }
+        return null
+    } catch {
+        return null
+    }
+}
+
+/**
  * 提取GIF的中间帧并返回sharp实例
  * 如果不是GIF或提取失败，返回null
  */
@@ -242,9 +262,16 @@ async function getModel(): Promise<nsfwjs.NSFWJS> {
         return cachedModel
     }
 
-    const model = await nsfwjs.load('InceptionV3')
-    cachedModel = model
-    return model
+    // 并发请求复用同一个加载Promise，避免重复加载和重复日志
+    if (!modelLoadingPromise) {
+        modelLoadingPromise = nsfwjs.load('InceptionV3').then((model) => {
+            cachedModel = model
+            modelLoadingPromise = null
+            return model
+        })
+    }
+
+    return modelLoadingPromise
 }
 
 /**
@@ -348,11 +375,25 @@ export const checkUrl = async (c: Context) => {
             })
         }
 
-        // 7. 处理图像：解码、格式转换、缩放为模型输入尺寸
+        // 7. 小尺寸图片直接放行
+        const dimensions = await getImageDimensions(tempFile)
+        if (dimensions && dimensions.width < MIN_DIMENSION_SIZE && dimensions.height < MIN_DIMENSION_SIZE) {
+            return c.json({
+                code: 200,
+                msg: 'success',
+                data: {
+                    sfw: 1,
+                    nsfw: 0,
+                    is_nsfw: false,
+                },
+            })
+        }
+
+        // 8. 处理图像：解码、格式转换、缩放为模型输入尺寸
         // tensor创建后如果后续步骤异常，必须在finally中dispose
         tensor = await processImageToTensor(tempFile, probe.mime)
 
-        // 8. 加载模型并进行NSFW分类
+        // 9. 加载模型并进行NSFW分类
         const model = await getModel()
         const result = await classifyImage(model, tensor)
 
