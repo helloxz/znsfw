@@ -7,6 +7,9 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
 
+// 关闭 sharp 的底层缓存，防止常驻内存无限增长
+sharp.cache(false)
+
 // 支持的图片MIME类型
 const ALLOWED_MIMES = new Set([
     'image/jpeg',
@@ -79,10 +82,10 @@ function validateUrlParam(c: Context): { url: string } | null {
  * 返回null表示请求失败或不满足条件
  */
 async function probeUrl(url: string): Promise<{ mime: string; contentLength: number } | null> {
-    try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS)
 
+    try {
         const headRes = await fetch(url, {
             method: 'HEAD',
             headers: {
@@ -91,7 +94,6 @@ async function probeUrl(url: string): Promise<{ mime: string; contentLength: num
             },
             signal: controller.signal,
         })
-        clearTimeout(timeoutId)
 
         if (!headRes.ok) {
             return null
@@ -105,6 +107,8 @@ async function probeUrl(url: string): Promise<{ mime: string; contentLength: num
         return { mime, contentLength }
     } catch {
         return null
+    } finally {
+        clearTimeout(timeoutId)
     }
 }
 
@@ -127,15 +131,14 @@ function isOverSizeLimit(contentLength: number): boolean {
  * 返回临时文件路径，失败返回null
  */
 async function downloadToTempFile(url: string, mime: string): Promise<string | null> {
+    const ext = MIME_TO_EXT[mime] || '.bin'
+    const filename = `${randomUUID()}${ext}`
+    const filepath = join(TEMP_DIR, filename)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS)
+
     try {
-        const ext = MIME_TO_EXT[mime] || '.bin'
-        const filename = `${randomUUID()}${ext}`
-        const filepath = join(TEMP_DIR, filename)
-
         await mkdir(TEMP_DIR, { recursive: true })
-
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS)
 
         const res = await fetch(url, {
             method: 'GET',
@@ -145,7 +148,6 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
             },
             signal: controller.signal,
         })
-        clearTimeout(timeoutId)
 
         if (!res.ok) {
             return null
@@ -159,6 +161,8 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
         return filepath
     } catch {
         return null
+    } finally {
+        clearTimeout(timeoutId)
     }
 }
 
@@ -414,7 +418,7 @@ export const checkUrl = async (c: Context) => {
             tensor.dispose()
         }
         // 清理临时文件
-        cleanupTempFile(tempFile)
+        await cleanupTempFile(tempFile)
     }
 }
 
