@@ -249,7 +249,11 @@ async function processImageToTensor(filepath: string, mime: string): Promise<tf.
 
     // 缩放到模型输入尺寸，保持比例居中裁剪，使用PNG避免压缩损失
     const imageBuffer = await sharpInstance
-        .resize(MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, { fit: 'cover' })
+        .resize(MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, { 
+            fit: 'fill',// 1. 强制铺满，不丢失边缘信息
+            kernel: 'lanczos3'// 2. 使用高质量重采样算法（Sharp默认也是这个）
+        })
+        .removeAlpha() // 3. 去掉透明通道，防止透明背景变黑/变白干扰模型
         .png()
         .toBuffer()
 

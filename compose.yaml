@@ -2,6 +2,10 @@ services:
   znsfw:
     container_name: znsfw
     image: helloz/znsfw
+    deploy:
+      resources:
+        limits:
+          memory: 600M  # 限制内存
     # networks:
     #   - mynet
     ports:
