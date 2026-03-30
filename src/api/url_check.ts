@@ -157,6 +157,8 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
 
         return filepath
     } catch {
+        // 下载或写入中途失败，清理残留的临时文件
+        try { await unlink(filepath) } catch {}
         return null
     } finally {
         clearTimeout(timeoutId)
