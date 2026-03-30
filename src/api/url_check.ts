@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import * as nsfwjs from 'nsfwjs'
 import * as tf from '@tensorflow/tfjs-node'
 import sharp from 'sharp'
-import { writeFile, unlink, mkdir } from 'fs/promises'
+import { unlink, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
@@ -153,10 +153,7 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
             return null
         }
 
-        const arrayBuffer = await res.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
-
-        await writeFile(filepath, buffer)
+        await Bun.write(filepath, res)
 
         return filepath
     } catch {
