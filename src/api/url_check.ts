@@ -35,7 +35,7 @@ const MIN_DIMENSION_SIZE = 64
 const MODEL_INPUT_SIZE = 299
 
 // 请求头中的User-Agent
-const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
 
 // 临时文件目录
 const TEMP_DIR = join(tmpdir(), 'znsfw_temp')
@@ -55,24 +55,24 @@ let modelLoadingPromise: Promise<nsfwjs.NSFWJS> | null = null
 
 /**
  * 校验URL参数是否合法
- */
-/**
- * 校验URL参数是否合法
  * 必须以http://或https://开头
  */
 function validateUrlParam(c: Context): { url: string } | null {
     const url = c.req.query('url')
     if (!url) {
+        console.error('[url_check] Missing url parameter')
         return null
     }
 
     try {
         const parsed = new URL(url)
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            console.error(`[url_check] Invalid protocol: ${parsed.protocol}, url: ${url}`)
             return null
         }
         return { url }
-    } catch {
+    } catch (err) {
+        console.error(`[url_check] URL parse failed: ${url}`, err)
         return null
     }
 }
@@ -96,6 +96,7 @@ async function probeUrl(url: string): Promise<{ mime: string; contentLength: num
         })
 
         if (!headRes.ok) {
+            console.error(`[url_check] HEAD request failed: ${url}, status: ${headRes.status}`)
             return null
         }
 
@@ -104,8 +105,10 @@ async function probeUrl(url: string): Promise<{ mime: string; contentLength: num
         const mime = contentType.split(';')[0].trim().toLowerCase()
         const contentLength = parseInt(headRes.headers.get('content-length') || '0', 10)
 
+        console.log(`[url_check] Probe result: ${url}, mime: ${mime}, size: ${contentLength}`)
         return { mime, contentLength }
-    } catch {
+    } catch (err) {
+        console.error(`[url_check] HEAD request error: ${url}`, err)
         return null
     } finally {
         clearTimeout(timeoutId)
@@ -150,13 +153,16 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
         })
 
         if (!res.ok) {
+            console.error(`[url_check] GET request failed: ${url}, status: ${res.status}`)
             return null
         }
 
         await Bun.write(filepath, res)
+        console.log(`[url_check] Downloaded to: ${filepath}`)
 
         return filepath
-    } catch {
+    } catch (err) {
+        console.error(`[url_check] Download error: ${url}`, err)
         // 下载或写入中途失败，清理残留的临时文件
         try { await unlink(filepath) } catch {}
         return null
@@ -188,8 +194,13 @@ async function verifyMimeByContent(filepath: string, originalMime: string): Prom
         }
 
         const detectedMime = formatToMime[detectedFormat] || ''
-        return isAllowedMime(detectedMime)
-    } catch {
+        if (!isAllowedMime(detectedMime)) {
+            console.error(`[url_check] MIME mismatch: detected=${detectedFormat}(${detectedMime}), original=${originalMime}`)
+            return false
+        }
+        return true
+    } catch (err) {
+        console.error(`[url_check] Verify MIME error: ${filepath}`, err)
         return false
     }
 }
@@ -205,7 +216,8 @@ async function getImageDimensions(filepath: string): Promise<{ width: number; he
             return { width: metadata.width, height: metadata.height }
         }
         return null
-    } catch {
+    } catch (err) {
+        console.error(`[url_check] Get dimensions error: ${filepath}`, err)
         return null
     }
 }
@@ -225,9 +237,11 @@ async function extractGifMiddleFrame(filepath: string): Promise<sharp.Sharp | nu
 
         // 取中间帧
         const middleIndex = Math.floor(pages / 2)
+        console.log(`[url_check] Extracting GIF frame ${middleIndex}/${pages}: ${filepath}`)
 
         return sharp(filepath, { animated: true, page: middleIndex, pages: 1 })
-    } catch {
+    } catch (err) {
+        console.error(`[url_check] Extract GIF frame error: ${filepath}`, err)
         return null
     }
 }
@@ -243,6 +257,9 @@ async function processImageToTensor(filepath: string, mime: string): Promise<tf.
         // GIF取中间帧进行处理
         const gifFrame = await extractGifMiddleFrame(filepath)
         sharpInstance = gifFrame ?? sharp(filepath)
+        if (!gifFrame) {
+            console.log(`[url_check] GIF frame extraction failed, using original: ${filepath}`)
+        }
     } else {
         sharpInstance = sharp(filepath)
     }
@@ -271,10 +288,16 @@ async function getModel(): Promise<nsfwjs.NSFWJS> {
 
     // 并发请求复用同一个加载Promise，避免重复加载和重复日志
     if (!modelLoadingPromise) {
+        console.log('[url_check] Loading NSFW model...')
         modelLoadingPromise = nsfwjs.load('InceptionV3').then((model) => {
+            console.log('[url_check] NSFW model loaded successfully')
             cachedModel = model
             modelLoadingPromise = null
             return model
+        }).catch((err) => {
+            console.error('[url_check] Failed to load NSFW model:', err)
+            modelLoadingPromise = null
+            throw err
         })
     }
 
@@ -321,6 +344,8 @@ async function cleanupTempFile(filepath: string) {
  * 接收url参数，下载图片并使用InceptionV3模型进行色情图像识别
  */
 export const checkUrl = async (c: Context) => {
+    console.log(`[url_check] Request: ${c.req.url}`)
+
     // 1. 校验URL参数
     const urlInfo = validateUrlParam(c)
     if (!urlInfo) {
@@ -330,6 +355,8 @@ export const checkUrl = async (c: Context) => {
             data: null,
         })
     }
+
+    console.log(`[url_check] Processing: ${urlInfo.url}`)
 
     // 2. 通过HEAD请求探测MIME类型和内容长度
     const probe = await probeUrl(urlInfo.url)
@@ -385,6 +412,7 @@ export const checkUrl = async (c: Context) => {
         // 7. 小尺寸图片直接放行
         const dimensions = await getImageDimensions(tempFile)
         if (dimensions && dimensions.width < MIN_DIMENSION_SIZE && dimensions.height < MIN_DIMENSION_SIZE) {
+            console.log(`[url_check] Small image passed: ${dimensions.width}x${dimensions.height}`)
             return c.json({
                 code: 200,
                 msg: 'success',
@@ -404,12 +432,14 @@ export const checkUrl = async (c: Context) => {
         const model = await getModel()
         const result = await classifyImage(model, tensor)
 
+        console.log(`[url_check] Result: ${urlInfo.url}, sfw=${result.sfw}, nsfw=${result.nsfw}, is_nsfw=${result.is_nsfw}`)
         return c.json({
             code: 200,
             msg: 'success',
             data: result,
         })
     } catch (err) {
+        console.error(`[url_check] Processing failed: ${urlInfo.url}`, err)
         return c.json({
             code: -1000,
             msg: `Image processing failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
