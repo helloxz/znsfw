@@ -23,7 +23,7 @@ const ALLOWED_MIMES = new Set([
 const MAX_CONTENT_LENGTH = 10 * 1024 * 1024
 
 // 下载超时时间（60秒）
-const DOWNLOAD_TIMEOUT_MS = 60_000
+const DOWNLOAD_TIMEOUT_MS = 30_000
 
 // NSFW判定阈值：Hentai或Porn任意一个>=0.8即判定为NSFW
 const NSFW_THRESHOLD = 0.65
@@ -138,6 +138,8 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
     const filepath = join(TEMP_DIR, filename)
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS)
+    const startTime = Date.now()
+    console.log(`[url_check] Download started: ${url}, date: ${new Date().toISOString()}`)
 
     try {
         await mkdir(TEMP_DIR, { recursive: true })
@@ -157,6 +159,8 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
         }
 
         await Bun.write(filepath, res)
+        const endTime = Date.now()
+        console.log(`[url_check] Download completed: ${url}, time: ${endTime - startTime}ms, date: ${new Date().toISOString()}`)
 
         return filepath
     } catch (err) {
