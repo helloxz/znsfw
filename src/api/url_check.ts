@@ -22,10 +22,10 @@ const ALLOWED_MIMES = new Set([
 // 最大允许的内容长度（10MB）
 const MAX_CONTENT_LENGTH = 10 * 1024 * 1024
 
-// 下载超时时间（60秒）
-const DOWNLOAD_TIMEOUT_MS = 30_000
+// 下载超时时间（默认30秒）
+const DOWNLOAD_TIMEOUT_MS = Number(process.env.NSFW_TIMEOUT) || 30000
 
-// NSFW判定阈值：Hentai或Porn任意一个>=0.8即判定为NSFW
+// NSFW判定阈值：Hentai或Porn任意一个>=0.65即判定为NSFW
 const NSFW_THRESHOLD = 0.65
 
 // 小于此尺寸（宽高都小于）的图片直接放行
@@ -139,7 +139,7 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS)
     const startTime = Date.now()
-    console.log(`[url_check] Download started: ${url}, date: ${new Date().toISOString()}`)
+    // console.log(`[url_check] Download started: ${url}, date: ${new Date().toISOString()}`)
 
     try {
         await mkdir(TEMP_DIR, { recursive: true })
@@ -161,7 +161,7 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
         const buffer = await res.arrayBuffer()
         await Bun.write(filepath, buffer)
         const endTime = Date.now()
-        console.log(`[url_check] Download completed: ${url}, time: ${endTime - startTime}ms, date: ${new Date().toISOString()}`)
+        // console.log(`[url_check] Download completed: ${url}, time: ${endTime - startTime}ms, date: ${new Date().toISOString()}`)
 
         return filepath
     } catch (err) {
