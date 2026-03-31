@@ -158,7 +158,8 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
             return null
         }
 
-        await Bun.write(filepath, res)
+        const buffer = await res.arrayBuffer()
+        await Bun.write(filepath, buffer)
         const endTime = Date.now()
         console.log(`[url_check] Download completed: ${url}, time: ${endTime - startTime}ms, date: ${new Date().toISOString()}`)
 
