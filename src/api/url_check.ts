@@ -105,7 +105,6 @@ async function probeUrl(url: string): Promise<{ mime: string; contentLength: num
         const mime = contentType.split(';')[0].trim().toLowerCase()
         const contentLength = parseInt(headRes.headers.get('content-length') || '0', 10)
 
-        console.log(`[url_check] Probe result: ${url}, mime: ${mime}, size: ${contentLength}`)
         return { mime, contentLength }
     } catch (err) {
         console.error(`[url_check] HEAD request error: ${url}`, err)
@@ -158,7 +157,6 @@ async function downloadToTempFile(url: string, mime: string): Promise<string | n
         }
 
         await Bun.write(filepath, res)
-        console.log(`[url_check] Downloaded to: ${filepath}`)
 
         return filepath
     } catch (err) {
@@ -237,7 +235,6 @@ async function extractGifMiddleFrame(filepath: string): Promise<sharp.Sharp | nu
 
         // 取中间帧
         const middleIndex = Math.floor(pages / 2)
-        console.log(`[url_check] Extracting GIF frame ${middleIndex}/${pages}: ${filepath}`)
 
         return sharp(filepath, { animated: true, page: middleIndex, pages: 1 })
     } catch (err) {
@@ -257,9 +254,6 @@ async function processImageToTensor(filepath: string, mime: string): Promise<tf.
         // GIF取中间帧进行处理
         const gifFrame = await extractGifMiddleFrame(filepath)
         sharpInstance = gifFrame ?? sharp(filepath)
-        if (!gifFrame) {
-            console.log(`[url_check] GIF frame extraction failed, using original: ${filepath}`)
-        }
     } else {
         sharpInstance = sharp(filepath)
     }
@@ -288,9 +282,7 @@ async function getModel(): Promise<nsfwjs.NSFWJS> {
 
     // 并发请求复用同一个加载Promise，避免重复加载和重复日志
     if (!modelLoadingPromise) {
-        console.log('[url_check] Loading NSFW model...')
         modelLoadingPromise = nsfwjs.load('InceptionV3').then((model) => {
-            console.log('[url_check] NSFW model loaded successfully')
             cachedModel = model
             modelLoadingPromise = null
             return model
@@ -344,7 +336,6 @@ async function cleanupTempFile(filepath: string) {
  * 接收url参数，下载图片并使用InceptionV3模型进行色情图像识别
  */
 export const checkUrl = async (c: Context) => {
-    console.log(`[url_check] Request: ${c.req.url}`)
 
     // 1. 校验URL参数
     const urlInfo = validateUrlParam(c)
@@ -355,8 +346,6 @@ export const checkUrl = async (c: Context) => {
             data: null,
         })
     }
-
-    console.log(`[url_check] Processing: ${urlInfo.url}`)
 
     // 2. 通过HEAD请求探测MIME类型和内容长度
     const probe = await probeUrl(urlInfo.url)
@@ -412,7 +401,6 @@ export const checkUrl = async (c: Context) => {
         // 7. 小尺寸图片直接放行
         const dimensions = await getImageDimensions(tempFile)
         if (dimensions && dimensions.width < MIN_DIMENSION_SIZE && dimensions.height < MIN_DIMENSION_SIZE) {
-            console.log(`[url_check] Small image passed: ${dimensions.width}x${dimensions.height}`)
             return c.json({
                 code: 200,
                 msg: 'success',
@@ -432,7 +420,6 @@ export const checkUrl = async (c: Context) => {
         const model = await getModel()
         const result = await classifyImage(model, tensor)
 
-        console.log(`[url_check] Result: ${urlInfo.url}, sfw=${result.sfw}, nsfw=${result.nsfw}, is_nsfw=${result.is_nsfw}`)
         return c.json({
             code: 200,
             msg: 'success',
